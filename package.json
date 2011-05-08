@@ -1,15 +1,15 @@
 {
-    "name": "nodemon",
-    "homepage": "http://github.com/remy/nodemon",
+    "name": "autotest",
+    "homepage": "http://github.com/realistschuckle/autotest",
     "author": {
-      "name": "Remy Sharp",
-      "url": "http://github.com/remy"
+      "name": "Curtis Schlak",
+      "url": "http://github.com/realistschuckle"
     },
-    "bin": { "nodemon" : "./nodemon.js" },
-    "repository": { "type" : "git", "url" : "http://github.com/remy/nodemon.git" },
-    "description": "Simple monitor script for use during development of a node.js app.",
-    "keywords": ["monitor", "development", "restart", "autoload", "reload", "terminal"],
-    "version": "0.4.1",
+    "bin": { "autotest" : "./autotest.js" },
+    "repository": { "type" : "git", "url" : "http://github.com/realistschuckle/autotest.git" },
+    "description": "Simple script to provide some autotest capabilities.",
+    "keywords": ["monitor", "development", "restart", "autotest", "reload"],
+    "version": "0.1.0",
     "preferGlobal" : "true",
-    "main": "./nodemon"
+    "main": "./autotest"
 }
