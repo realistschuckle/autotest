@@ -11,8 +11,8 @@ var fs = require('fs'),
     app = nodeArgs[0],
     node = null, 
     monitor = null,
-    ignoreFilePath = './.nodemonignore',
-    oldIgnoreFilePath = './nodemon-ignore',
+    ignoreFilePath = './.autotestignore',
+    oldIgnoreFilePath = './autotest-ignore',
     ignoreFiles = [flag, ignoreFilePath], // ignore the monitor flag by default
     reIgnoreFiles = null,
     timeout = 1000, // check every 1 second
@@ -27,7 +27,8 @@ var fs = require('fs'),
     reAsterisk = /\*/g;
 
 function startNode() {
-  sys.log('\x1B[32m[nodemon] starting node\x1B[0m');
+  invokeTimeout = null;
+  sys.log('\x1B[1J\x1B[f\x1B[32m[autotest] running tests\x1B[0m');
 
   var ext = path.extname(app);
   if (ext === '.coffee') {
@@ -45,14 +46,9 @@ function startNode() {
   });
 
   node.on('exit', function (code, signal) {
-    // exit the monitor, but do it gracefully
-    if (signal == 'SIGUSR2') {
-      // restart
-      startNode();
-    } else {
-      sys.log('\x1B[1;31m[nodemon] app crashed - waiting for file change before starting...\x1B[0m');
-      node = null;
-    }
+    // We expect the test run to end, so do this gracefully.
+    node = null;
+    return;
   });
 }
 
@@ -77,9 +73,9 @@ function startMonitor() {
         if (restartTimer !== null) clearTimeout(restartTimer);
         
         restartTimer = setTimeout(function () {
-          sys.log('[nodemon] restarting due to changes...');
+          sys.log('[autotest] restarting due to changes...');
           files.forEach(function (file) {
-            sys.log('[nodemon] ' + file);
+            sys.log('[autotest] ' + file);
           });
           sys.print('\n\n');
 
@@ -110,7 +106,7 @@ function readIgnoreFile() {
       return;
     }
     
-    sys.log('[nodemon] reading ignore list');
+    sys.log('[autotest] reading ignore list');
     
     ignoreFiles = [flag, ignoreFilePath];
     fs.readFileSync(ignoreFilePath).toString().split(/\n/).forEach(function (line) {
@@ -128,7 +124,7 @@ function readIgnoreFile() {
 }
 
 function usage() {
-  sys.print('usage: nodemon [--debug] [your node app]\ne.g.: nodemon ./server.js localhost 8080\nFor details see http://github.com/remy/nodemon/\n\n');
+  sys.print('usage: autotest [--debug] [your node app]\ne.g.: autotest ./server.js localhost 8080\nFor details see http://github.com/realistschuckle/autotest/\n\n');
 }
 
 function controlArg(nodeArgs, label, fn) {
@@ -144,8 +140,12 @@ function controlArg(nodeArgs, label, fn) {
 }
 
 // attempt to shutdown the wrapped node instance and remove
-// the monitor file as nodemon exists
+// the monitor file as autotest exists
 function cleanup() {
+  if(invokeTimeout) {
+    clearTimeout(invokeTimeout);
+    invokeTimeout = null;
+  }
   node && node.kill();
   fs.unlink(flag);  
 }
@@ -166,7 +166,7 @@ controlArg(nodeArgs, 'delay', function (arg, i) {
   var delay = nodeArgs[i+1];
   nodeArgs.splice(i, 2); // remove the delay from the arguments
   if (delay) {
-    sys.log('[nodemon] Adding delay of ' + delay + ' seconds');
+    sys.log('[autotest] Adding delay of ' + delay + ' seconds');
     restartDelay = delay * 1000; // in seconds
   }
 });
@@ -183,7 +183,7 @@ if (!nodeArgs.length || !path.existsSync(app)) {
   // or we could, but the code would get messy, so this will do exactly 
   // what we're after - if the file doesn't exist, it'll throw.
   try {
-    app = JSON.parse(fs.readFileSync('./package.json').toString()).main;
+    app = JSON.parse(fs.readFileSync('./package.json').toString()).scripts.test;
     
     if (nodeArgs[0] == '--debug') {
       nodeArgs.splice(1, 0, app);
@@ -197,12 +197,12 @@ if (!nodeArgs.length || !path.existsSync(app)) {
   }
 }
 
-sys.log('[nodemon] v' + meta.version);
+sys.log('[autotest] v' + meta.version);
 
 // Change to application dir
 process.chdir(path.dirname(app));
 app = path.basename(app);
-sys.log('[nodemon] running ' + app + ' in ' + process.cwd());
+sys.log('[autotest] running ' + app + ' in ' + process.cwd());
 
 startNode();
 
@@ -213,7 +213,7 @@ path.exists(ignoreFilePath, function (exists) {
     // try the old format
     path.exists(oldIgnoreFilePath, function (exists) {
       if (exists) {
-        sys.log('[nodemon] detected old style .nodemonignore');
+        sys.log('[autotest] detected old style .autotestignore');
         ignoreFilePath = oldIgnoreFilePath;
       }
       readIgnoreFile();
@@ -224,7 +224,7 @@ path.exists(ignoreFilePath, function (exists) {
 });
 
 // this little bit of hoop jumping is because sometimes the file can't be
-// touched properly, and it send nodemon in to a loop of restarting.
+// touched properly, and it send autotest in to a loop of restarting.
 // this way, the .monitor file is removed entirely, and recreated with 
 // permissions that anyone can remove it later (i.e. if you run as root
 // by accident and then try again later).
@@ -235,18 +235,23 @@ fs.chmodSync(flag, '666');
 // remove the flag file on exit
 process.on('exit', function (code) {
   cleanup();
-  sys.log('[nodemon] exiting');
+  sys.log('[autotest] exiting');
 });
 
+var invokeTimeout = null;
 // usual suspect: ctrl+c exit
 process.on('SIGINT', function () {
-  cleanup();
-  process.exit(0);
+  if(invokeTimeout) {
+    cleanup();
+    process.exit(0);
+  }
+  sys.log('Press CTRL+C again to exit...')
+  invokeTimeout = setTimeout(startNode, 2000);
 });
 
-// on exception *inside* nodemon, shutdown wrapped node app
+// on exception *inside* autotest, shutdown wrapped node app
 process.on('uncaughtException', function (err) {
-  sys.log('[nodemon] exception in nodemon killing node');
+  sys.log('[autotest] exception in autotest killing node');
   sys.error(err.stack);
   cleanup();
 });
