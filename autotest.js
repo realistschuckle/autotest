@@ -11,6 +11,7 @@ var fs = require('fs'),
 	nodeArgs = process.ARGV.splice(2),
 	// removes 'node' and this script
 	app = nodeArgs[0],
+	owd = process.cwd(),
 	node = null,
 	monitor = null,
 	ignoreFilePath = './.autotestignore',
@@ -61,7 +62,7 @@ function startNode() {
 }
 
 function startMonitor() {
-	var cmd = 'find . -type f -newer ' + flag + ' -print';
+	var cmd = 'find ' + owd + ' -type f -newer ' + flag + ' -print';
 
 	exec(cmd, function (error, stdout, stderr) {
 		var files = stdout.split(/\n/);
