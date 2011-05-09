@@ -1,200 +1,204 @@
 #!/usr/bin/env node
+
 var fs = require('fs'),
-    sys = require('sys'),
-    childProcess = require('child_process'),
-    path = require('path'),
-    spawn = childProcess.spawn,
-    meta = JSON.parse(fs.readFileSync(__dirname + '/package.json')),
-    exec = childProcess.exec,
-    flag = './.monitor',
-    nodeArgs = process.ARGV.splice(2), // removes 'node' and this script
-    app = nodeArgs[0],
-    node = null, 
-    monitor = null,
-    ignoreFilePath = './.autotestignore',
-    oldIgnoreFilePath = './autotest-ignore',
-    ignoreFiles = [flag, ignoreFilePath], // ignore the monitor flag by default
-    reIgnoreFiles = null,
-    timeout = 1000, // check every 1 second
-    restartDelay = 0, // controlled through arg --delay 10 (for 10 seconds)
-    restartTimer = null,
-    // create once, reuse as needed
-    reEscComments = /\\#/g,
-    reUnescapeComments = /\^\^/g, // note that '^^' is used in place of escaped comments
-    reComments = /#.*$/,
-    reTrim = /^(\s|\u00A0)+|(\s|\u00A0)+$/g,
-    reEscapeChars = /[.|\-[\]()\\]/g,
-    reAsterisk = /\*/g;
+	sys = require('sys'),
+	childProcess = require('child_process'),
+	path = require('path'),
+	spawn = childProcess.spawn,
+	meta = JSON.parse(fs.readFileSync(__dirname + '/package.json')),
+	exec = childProcess.exec,
+	flag = './.monitor',
+	nodeArgs = process.ARGV.splice(2),
+	// removes 'node' and this script
+	app = nodeArgs[0],
+	node = null,
+	monitor = null,
+	ignoreFilePath = './.autotestignore',
+	oldIgnoreFilePath = './autotest-ignore',
+	ignoreFiles = [flag, ignoreFilePath],
+	// ignore the monitor flag by default
+	reIgnoreFiles = null,
+	timeout = 1000,
+	// check every 1 second
+	restartDelay = 0,
+	// controlled through arg --delay 10 (for 10 seconds)
+	restartTimer = null,
+	// create once, reuse as needed
+	reEscComments = /\\#/g,
+	reUnescapeComments = /\^\^/g,
+	// note that '^^' is used in place of escaped comments
+	reComments = /#.*$/,
+	reTrim = /^(\s|\u00A0)+|(\s|\u00A0)+$/g,
+	reEscapeChars = /[.|\-[\]()\\]/g,
+	reAsterisk = /\*/g;
 
 function startNode() {
-  invokeTimeout = null;
-  sys.log('\x1B[1J\x1B[f\x1B[32m[autotest] running tests\x1B[0m');
+	invokeTimeout = null;
+	sys.log('\x1B[1J\x1B[f\x1B[32m[autotest] running tests\x1B[0m');
 
-  var ext = path.extname(app);
-  if (ext === '.coffee') {
-    node = spawn('coffee', nodeArgs);
-  } else {
-    node = spawn('node', nodeArgs);
-  }
-  
-  node.stdout.on('data', function (data) {
-    sys.print(data);
-  });
+	var args = nodeArgs.slice(0);
+	args[0] = app;
+	var ext = path.extname(app);
+	if (ext === '.coffee') {
+		node = spawn('coffee', args);
+	} else {
+		node = spawn('node', args);
+	}
 
-  node.stderr.on('data', function (data) {
-    sys.error(data);
-  });
+	node.stdout.on('data', function (data) {
+		sys.print(data);
+	});
 
-  node.on('exit', function (code, signal) {
-    // We expect the test run to end, so do this gracefully.
-    node = null;
-    return;
-  });
+	node.stderr.on('data', function (data) {
+		sys.error(data);
+	});
+
+	node.on('exit', function (code, signal) {
+		// We expect the test run to end, so do this gracefully.
+		node = null;
+		return;
+	});
 }
 
 function startMonitor() {
-  var cmd = 'find . -type f -newer ' + flag + ' -print';
+	var cmd = 'find . -type f -newer ' + flag + ' -print';
 
-  exec(cmd, function (error, stdout, stderr) {
-    var files = stdout.split(/\n/);
+	exec(cmd, function (error, stdout, stderr) {
+		var files = stdout.split(/\n/);
 
-    files.pop(); // remove blank line ending and split
-    if (files.length) {
-      // filter ignored files
-      if (ignoreFiles.length) {
-        files = files.filter(function(file) {
-          return !reIgnoreFiles.test(file);
-        });
-      }
+		files.pop(); // remove blank line ending and split
+		if (files.length) {
+			// filter ignored files
+			if (ignoreFiles.length) {
+				files = files.filter(function (file) {
+					return !reIgnoreFiles.test(file);
+				});
+			}
 
-      fs.writeFileSync(flag, '');
+			fs.writeFileSync(flag, '');
 
-      if (files.length) {
-        if (restartTimer !== null) clearTimeout(restartTimer);
-        
-        restartTimer = setTimeout(function () {
-          sys.log('[autotest] restarting due to changes...');
-          files.forEach(function (file) {
-            sys.log('[autotest] ' + file);
-          });
-          sys.print('\n\n');
+			if (files.length) {
+				if (restartTimer !== null) clearTimeout(restartTimer);
 
-          if (node !== null) {
-            node.kill('SIGUSR2');
-          } else {
-            startNode();
-          }          
-        }, restartDelay);
-      }
-    }
-    
-    setTimeout(startMonitor, timeout);
-  });
+				restartTimer = setTimeout(function () {
+					sys.log('[autotest] restarting due to changes...');
+					files.forEach(function (file) {
+						sys.log('[autotest] ' + file);
+					});
+					sys.print('\n\n');
+
+					if (node !== null) {
+						node.kill('SIGUSR2');
+					} else {
+						startNode();
+					}
+				}, restartDelay);
+			}
+		}
+
+		setTimeout(startMonitor, timeout);
+	});
 }
 
 function readIgnoreFile() {
-  fs.unwatchFile(ignoreFilePath);
+	fs.unwatchFile(ignoreFilePath);
 
-  // Check if ignore file still exists. Vim tends to delete it before replacing with changed file
-  path.exists(ignoreFilePath, function(exists) {
-    if (!exists) {
-      // we'll touch the ignore file to make sure it gets created and
-      // if Vim is writing the file, it'll just overwrite it - but also
-      // prevent from constant file io if the file doesn't exist
-      fs.writeFileSync(ignoreFilePath, "\n");
-      setTimeout(readIgnoreFile, 500);
-      return;
-    }
-    
-    sys.log('[autotest] reading ignore list');
-    
-    ignoreFiles = [flag, ignoreFilePath];
-    fs.readFileSync(ignoreFilePath).toString().split(/\n/).forEach(function (line) {
-      // remove comments and trim lines
-      
-      // this mess of replace methods is escaping "\#" to allow for emacs temp files
-      if (line = line.replace(reEscComments, '^^').replace(reComments, '').replace(reUnescapeComments, '#').replace(reTrim, '')) {
-         ignoreFiles.push(line.replace(reEscapeChars, '\\$&').replace(reAsterisk, '.*'));
-      }
-    });
-    reIgnoreFiles = new RegExp(ignoreFiles.join('|'));
+	// Check if ignore file still exists. Vim tends to delete it before replacing with changed file
+	path.exists(ignoreFilePath, function (exists) {
+		sys.log('[autotest] reading ignore list');
 
-    fs.watchFile(ignoreFilePath, { persistent: false }, readIgnoreFile);
-  });
+		ignoreFiles = [flag, ignoreFilePath];
+		try {
+			fs.readFileSync(ignoreFilePath).toString().split(/\n/).forEach(function (line) {
+				// remove comments and trim lines
+				// this mess of replace methods is escaping "\#" to allow for emacs temp files
+				if (line = line.replace(reEscComments, '^^').replace(reComments, '').replace(reUnescapeComments, '#').replace(reTrim, '')) {
+					ignoreFiles.push(line.replace(reEscapeChars, '\\$&').replace(reAsterisk, '.*'));
+				}
+			});
+			reIgnoreFiles = new RegExp(ignoreFiles.join('|'));
+
+			fs.watchFile(ignoreFilePath, {
+				persistent: false
+			}, readIgnoreFile);
+		} catch (e) {}
+	});
 }
 
 function usage() {
-  sys.print('usage: autotest [--debug] [your node app]\ne.g.: autotest ./server.js localhost 8080\nFor details see http://github.com/realistschuckle/autotest/\n\n');
+	sys.print('usage: autotest [--debug] [your node app]\ne.g.: autotest ./server.js localhost 8080\nFor details see http://github.com/realistschuckle/autotest/\n\n');
 }
 
 function controlArg(nodeArgs, label, fn) {
-  var i;
-  
-  if ((i = nodeArgs.indexOf(label)) !== -1) {
-    fn(nodeArgs[i], i);
-  } else if ((i = nodeArgs.indexOf('-' + label.substr(1))) !== -1) {
-    fn(nodeArgs[i], i);
-  } else if ((i = nodeArgs.indexOf('--' + label)) !== -1) {
-    fn(nodeArgs[i], i);
-  }
+	var i;
+
+	if ((i = nodeArgs.indexOf(label)) !== -1) {
+		fn(nodeArgs[i], i);
+	} else if ((i = nodeArgs.indexOf('-' + label.substr(1))) !== -1) {
+		fn(nodeArgs[i], i);
+	} else if ((i = nodeArgs.indexOf('--' + label)) !== -1) {
+		fn(nodeArgs[i], i);
+	}
 }
 
 // attempt to shutdown the wrapped node instance and remove
 // the monitor file as autotest exists
+
+
 function cleanup() {
-  if(invokeTimeout) {
-    clearTimeout(invokeTimeout);
-    invokeTimeout = null;
-  }
-  node && node.kill();
-  fs.unlink(flag);  
+	if (invokeTimeout) {
+		clearTimeout(invokeTimeout);
+		invokeTimeout = null;
+	}
+	node && node.kill();
+	fs.unlink(flag);
 }
 
 // control arguments test for "help" or "--help" or "-h", run the callback and exit
 controlArg(nodeArgs, 'help', function () {
-  usage();
-  process.exit();
+	usage();
+	process.exit();
 });
 
 controlArg(nodeArgs, 'version', function () {
-  sys.print('v' + meta.version + '\n');
-  process.exit();
+	sys.print('v' + meta.version + '\n');
+	process.exit();
 });
 
 // look for delay flag
 controlArg(nodeArgs, 'delay', function (arg, i) {
-  var delay = nodeArgs[i+1];
-  nodeArgs.splice(i, 2); // remove the delay from the arguments
-  if (delay) {
-    sys.log('[autotest] Adding delay of ' + delay + ' seconds');
-    restartDelay = delay * 1000; // in seconds
-  }
+	var delay = nodeArgs[i + 1];
+	nodeArgs.splice(i, 2); // remove the delay from the arguments
+	if (delay) {
+		sys.log('[autotest] Adding delay of ' + delay + ' seconds');
+		restartDelay = delay * 1000; // in seconds
+	}
 });
 
 controlArg(nodeArgs, '--debug', function (arg, i) {
-  nodeArgs.splice(i, 1);
-  app = nodeArgs[0];
-  nodeArgs.unshift('--debug'); // put it at the front
+	nodeArgs.splice(i, 1);
+	app = nodeArgs[0];
+	nodeArgs.unshift('--debug'); // put it at the front
 });
 
 if (!nodeArgs.length || !path.existsSync(app)) {
-  // try to get the app from the package.json
-  // doing a try/catch because we can't use the path.exist callback pattern
-  // or we could, but the code would get messy, so this will do exactly 
-  // what we're after - if the file doesn't exist, it'll throw.
-  try {
-    app = JSON.parse(fs.readFileSync('./package.json').toString()).scripts.test;
-    
-    if (nodeArgs[0] == '--debug') {
-      nodeArgs.splice(1, 0, app);
-    } else {
-      nodeArgs.unshift(app);
-    }
-  } catch (e) {
-    // no app found to run - so give them a tip and get the feck out
-    usage();
-    process.exit();
-  }
+	// try to get the app from the package.json
+	// doing a try/catch because we can't use the path.exist callback pattern
+	// or we could, but the code would get messy, so this will do exactly 
+	// what we're after - if the file doesn't exist, it'll throw.
+	try {
+		app = JSON.parse(fs.readFileSync('./package.json').toString()).scripts.test;
+
+		if (nodeArgs[0] == '--debug') {
+			nodeArgs.splice(1, 0, app);
+		} else {
+			nodeArgs.unshift(app);
+		}
+	} catch (e) {
+		// no app found to run - so give them a tip and get the feck out
+		usage();
+		process.exit();
+	}
 }
 
 sys.log('[autotest] v' + meta.version);
@@ -209,18 +213,18 @@ startNode();
 setTimeout(startMonitor, timeout);
 
 path.exists(ignoreFilePath, function (exists) {
-  if (!exists) {
-    // try the old format
-    path.exists(oldIgnoreFilePath, function (exists) {
-      if (exists) {
-        sys.log('[autotest] detected old style .autotestignore');
-        ignoreFilePath = oldIgnoreFilePath;
-      }
-      readIgnoreFile();
-    });
-  } else {
-    readIgnoreFile();
-  }
+	if (!exists) {
+		// try the old format
+		path.exists(oldIgnoreFilePath, function (exists) {
+			if (exists) {
+				sys.log('[autotest] detected old style .autotestignore');
+				ignoreFilePath = oldIgnoreFilePath;
+			}
+			readIgnoreFile();
+		});
+	} else {
+		readIgnoreFile();
+	}
 });
 
 // this little bit of hoop jumping is because sometimes the file can't be
@@ -234,24 +238,24 @@ fs.chmodSync(flag, '666');
 
 // remove the flag file on exit
 process.on('exit', function (code) {
-  cleanup();
-  sys.log('[autotest] exiting');
+	cleanup();
+	sys.log('[autotest] exiting');
 });
 
 var invokeTimeout = null;
 // usual suspect: ctrl+c exit
 process.on('SIGINT', function () {
-  if(invokeTimeout) {
-    cleanup();
-    process.exit(0);
-  }
-  sys.log('Press CTRL+C again to exit...')
-  invokeTimeout = setTimeout(startNode, 2000);
+	if (invokeTimeout) {
+		cleanup();
+		process.exit(0);
+	}
+	sys.log('Press CTRL+C again to exit...')
+	invokeTimeout = setTimeout(startNode, 2000);
 });
 
 // on exception *inside* autotest, shutdown wrapped node app
 process.on('uncaughtException', function (err) {
-  sys.log('[autotest] exception in autotest killing node');
-  sys.error(err.stack);
-  cleanup();
+	sys.log('[autotest] exception in autotest killing node');
+	sys.error(err.stack);
+	cleanup();
 });
