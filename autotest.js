@@ -69,7 +69,7 @@ function startMonitor() {
 		files.pop(); // remove blank line ending and split
 		if (files.length) {
 			// filter ignored files
-			if (ignoreFiles.length) {
+			if (ignoreFiles.length && reIgnoreFiles) {
 				files = files.filter(function (file) {
 					return !reIgnoreFiles.test(file);
 				});
