@@ -14,11 +14,6 @@ var fs = require('fs'),
 	owd = process.cwd(),
 	node = null,
 	monitor = null,
-	ignoreFilePath = './.autotestignore',
-	oldIgnoreFilePath = './autotest-ignore',
-	ignoreFiles = [flag, ignoreFilePath],
-	// ignore the monitor flag by default
-	reIgnoreFiles = null,
 	timeout = 1000,
 	// check every 1 second
 	restartDelay = 0,
@@ -69,13 +64,6 @@ function startMonitor() {
 
 		files.pop(); // remove blank line ending and split
 		if (files.length) {
-			// filter ignored files
-			if (ignoreFiles.length && reIgnoreFiles) {
-				files = files.filter(function (file) {
-					return !reIgnoreFiles.test(file);
-				});
-			}
-
 			fs.writeFileSync(flag, '');
 
 			if (files.length) {
@@ -101,33 +89,8 @@ function startMonitor() {
 	});
 }
 
-function readIgnoreFile() {
-	fs.unwatchFile(ignoreFilePath);
-
-	// Check if ignore file still exists. Vim tends to delete it before replacing with changed file
-	path.exists(ignoreFilePath, function (exists) {
-		sys.log('[autotest] reading ignore list');
-
-		ignoreFiles = [flag, ignoreFilePath];
-		try {
-			fs.readFileSync(ignoreFilePath).toString().split(/\n/).forEach(function (line) {
-				// remove comments and trim lines
-				// this mess of replace methods is escaping "\#" to allow for emacs temp files
-				if (line = line.replace(reEscComments, '^^').replace(reComments, '').replace(reUnescapeComments, '#').replace(reTrim, '')) {
-					ignoreFiles.push(line.replace(reEscapeChars, '\\$&').replace(reAsterisk, '.*'));
-				}
-			});
-			reIgnoreFiles = new RegExp(ignoreFiles.join('|'));
-
-			fs.watchFile(ignoreFilePath, {
-				persistent: false
-			}, readIgnoreFile);
-		} catch (e) {}
-	});
-}
-
 function usage() {
-	sys.print('usage: autotest [--debug] [your node app]\ne.g.: autotest ./server.js localhost 8080\nFor details see http://github.com/realistschuckle/autotest/\n\n');
+	sys.print('usage: autotest [--debug] [your node app]\ne.g.: autotest ./server.js\nFor details see http://github.com/realistschuckle/autotest/\n\n');
 }
 
 function controlArg(nodeArgs, label, fn) {
@@ -212,21 +175,6 @@ sys.log('[autotest] running ' + app + ' in ' + process.cwd());
 startNode();
 
 setTimeout(startMonitor, timeout);
-
-path.exists(ignoreFilePath, function (exists) {
-	if (!exists) {
-		// try the old format
-		path.exists(oldIgnoreFilePath, function (exists) {
-			if (exists) {
-				sys.log('[autotest] detected old style .autotestignore');
-				ignoreFilePath = oldIgnoreFilePath;
-			}
-			readIgnoreFile();
-		});
-	} else {
-		readIgnoreFile();
-	}
-});
 
 // this little bit of hoop jumping is because sometimes the file can't be
 // touched properly, and it send autotest in to a loop of restarting.
