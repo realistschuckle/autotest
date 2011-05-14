@@ -30,7 +30,7 @@ var fs = require('fs'),
 
 function startNode() {
 	invokeTimeout = null;
-	sys.log('\x1B[1J\x1B[f\x1B[32m[autotest] running tests\x1B[0m');
+	sys.log('\x1B[80S\x1B[2J\x1B[;H\x1B[32m[autotest] running tests\x1B[0m');
 
 	var args = nodeArgs.slice(0);
 	args[0] = app;
@@ -57,7 +57,7 @@ function startNode() {
 }
 
 function startMonitor() {
-	var cmd = 'find ' + owd + ' -type f -newer ' + flag + ' -print';
+	var cmd = 'find ' + owd + ' -name \"*.js\" -type f -newer ' + flag + ' -print';
 
 	exec(cmd, function (error, stdout, stderr) {
 		var files = stdout.split(/\n/);
