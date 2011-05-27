@@ -37,6 +37,8 @@ function startNode() {
 	var ext = path.extname(app);
 	if (ext === '.coffee') {
 		node = spawn('coffee', args);
+	} else if(ext === '.py') {
+		node = spawn('python', args);
 	} else {
 		node = spawn('node', args);
 	}
@@ -57,7 +59,8 @@ function startNode() {
 }
 
 function startMonitor() {
-	var cmd = 'find ' + owd + ' -name \"*.js\" -type f -newer ' + flag + ' -print';
+	var ext = path.extname(app);
+	var cmd = 'find ' + owd + ' -name \"*' + ext + '\" -type f -newer ' + flag + ' -print';
 
 	exec(cmd, function (error, stdout, stderr) {
 		var files = stdout.split(/\n/);
