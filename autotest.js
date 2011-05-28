@@ -26,7 +26,12 @@ var fs = require('fs'),
 	reComments = /#.*$/,
 	reTrim = /^(\s|\u00A0)+|(\s|\u00A0)+$/g,
 	reEscapeChars = /[.|\-[\]()\\]/g,
-	reAsterisk = /\*/g;
+	reAsterisk = /\*/g,
+	runners = {
+		'.coffee': 'coffee',
+		'.py': 'python',
+		'.js': 'node'
+	};
 
 function startNode() {
 	invokeTimeout = null;
@@ -35,13 +40,8 @@ function startNode() {
 	var args = nodeArgs.slice(0);
 	args[0] = app;
 	var ext = path.extname(app);
-	if (ext === '.coffee') {
-		node = spawn('coffee', args);
-	} else if(ext === '.py') {
-		node = spawn('python', args);
-	} else {
-		node = spawn('node', args);
-	}
+	runner = runners[ext];
+	node = spawn(runner, args);
 
 	node.stdout.on('data', function (data) {
 		sys.print(data);
