@@ -7,7 +7,7 @@
     },
     "bin": { "autotest" : "./autotest.js" },
     "repository": { "type" : "git", "url" : "http://github.com/realistschuckle/autotest.git" },
-    "description": "Simple script to provide some autotest capabilities.",
+    "description": "Simple script to provide some autotest capabilities for node or python.",
     "keywords": ["monitor", "development", "restart", "autotest", "reload"],
     "version": "0.1.2",
     "preferGlobal" : "true",
