@@ -170,6 +170,10 @@ if (!nodeArgs.length || !path.existsSync(app)) {
 
 sys.log('[autotest] v' + meta.version);
 
+if(app.indexOf('node') == 0) {
+    app = app.slice(4).trim();
+}
+
 // Change to application dir
 process.chdir(path.dirname(app));
 app = path.basename(app);

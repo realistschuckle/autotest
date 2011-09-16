@@ -9,7 +9,7 @@
     "repository": { "type" : "git", "url" : "http://github.com/realistschuckle/autotest.git" },
     "description": "Simple script to provide some autotest capabilities for node or python.",
     "keywords": ["monitor", "development", "restart", "autotest", "reload"],
-    "version": "0.2.0",
+    "version": "0.2.2",
     "preferGlobal" : "true",
     "main": "./autotest"
 }
