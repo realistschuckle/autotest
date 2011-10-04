@@ -11,7 +11,8 @@ var fs = require('fs'),
 	nodeArgs = process.ARGV.splice(2),
 	// removes 'node' and this script
 	app = nodeArgs[0],
-	owd = process.cwd(),
+	// process.cwd sometimes changes to the location of autotest.js or .../bin/autotest
+	pwd = process.env['PWD'], 
 	node = null,
 	monitor = null,
 	timeout = 1000,
@@ -27,21 +28,26 @@ var fs = require('fs'),
 	reTrim = /^(\s|\u00A0)+|(\s|\u00A0)+$/g,
 	reEscapeChars = /[.|\-[\]()\\]/g,
 	reAsterisk = /\*/g,
+	runNpmTest = false,
 	runners = {
 		'.coffee': 'coffee',
 		'.py': 'python',
 		'.js': 'node'
 	};
 
-function startNode() {
+function startTests() {
 	invokeTimeout = null;
 	sys.log('\x1B[80S\x1B[2J\x1B[;H\x1B[32m[autotest] running tests\x1B[0m');
 
-	var args = nodeArgs.slice(0);
-	args[0] = app;
-	var ext = path.extname(app);
-	runner = runners[ext];
-	node = spawn(runner, args);
+	run = getRunnerAndArgs();
+	// sys.debug('[autotest] running ' + run.runner + ' with args: ' + run.args.join(' ') + ' in ' + pwd);
+	// in case of npm link or even starting with ./node_modules/.bin/autotest
+	// cwd gets confused and the process would think /usr/local/... or .../.bin/ is
+	// the current directory.
+	// $END{PWD} is not very portable, but neither is the version of find we are using.
+	if (process.cwd() !== pwd)
+		process.chdir(pwd);
+	node = spawn(run.runner, run.args);
 
 	node.stdout.on('data', function (data) {
 		sys.print(data);
@@ -58,9 +64,22 @@ function startNode() {
 	});
 }
 
+function getRunnerAndArgs() {
+	if (runNpmTest) {
+		return { 'runner' : 'npm', 'args' : 'test --loglevel silent'.split(' ') };
+	}
+	
+	var args = nodeArgs.slice(0);
+	args[0] = app;
+	var ext = path.extname(app);
+	var runner = runners[ext];
+	return { 'runner' : runner, 'args' : args };
+
+}
+
 function startMonitor() {
 	var ext = path.extname(app);
-	var cmd = 'find ' + owd + ' -name \"*' + ext + '\" -type f -newer ' + flag + ' -print';
+	var cmd = 'find ' + pwd + ' -name \"*' + ext + '\" -type f -newer ' + flag + ' -print';
 
 	exec(cmd, function (error, stdout, stderr) {
 		var files = stdout.split(/\n/);
@@ -82,7 +101,7 @@ function startMonitor() {
 					if (node !== null) {
 						node.kill('SIGUSR2');
 					} else {
-						startNode();
+						startTests();
 					}
 				}, restartDelay);
 			}
@@ -148,6 +167,11 @@ controlArg(nodeArgs, '--debug', function (arg, i) {
 	nodeArgs.unshift('--debug'); // put it at the front
 });
 
+controlArg(nodeArgs, 'npm', function (arg, i) {
+	runNpmTest = true;
+	sys.print('[autotest] Running tests using "npm test"');
+});
+
 if (!nodeArgs.length || !path.existsSync(app)) {
 	// try to get the app from the package.json
 	// doing a try/catch because we can't use the path.exist callback pattern
@@ -179,7 +203,7 @@ process.chdir(path.dirname(app));
 app = path.basename(app);
 sys.log('[autotest] running ' + app + ' in ' + process.cwd());
 
-startNode();
+startTests();
 
 setTimeout(startMonitor, timeout);
 
@@ -206,7 +230,7 @@ process.on('SIGINT', function () {
 		process.exit(0);
 	}
 	sys.log('Press CTRL+C again to exit...')
-	invokeTimeout = setTimeout(startNode, 2000);
+	invokeTimeout = setTimeout(startTests, 2000);
 });
 
 // on exception *inside* autotest, shutdown wrapped node app
