@@ -4,6 +4,7 @@ var fs = require('fs'),
 	sys = require('sys'),
 	childProcess = require('child_process'),
 	path = require('path'),
+	colors = require('colors'),
 	spawn = childProcess.spawn,
 	meta = JSON.parse(fs.readFileSync(__dirname + '/package.json')),
 	exec = childProcess.exec,
@@ -35,9 +36,15 @@ var fs = require('fs'),
 		'.js': 'node'
 	};
 
+function log(what, prefix) {
+	var pfx = typeof (prefix) === 'undefined' || prefix === null ? '' : prefix;
+	sys.log(pfx + '[autotest] '.green + what);
+}
+
 function startTests() {
 	invokeTimeout = null;
-	sys.log('\x1B[80S\x1B[2J\x1B[;H\x1B[32m[autotest] running tests\x1B[0m');
+	var prefix = '\x1B[80S\x1B[2J\x1B[;H'; // clear the screen
+	log('running tests'.green.bold, prefix);
 
 	run = getRunnerAndArgs();
 	// sys.debug('[autotest] running ' + run.runner + ' with args: ' + run.args.join(' ') + ' in ' + pwd);
@@ -92,9 +99,9 @@ function startMonitor() {
 				if (restartTimer !== null) clearTimeout(restartTimer);
 
 				restartTimer = setTimeout(function () {
-					sys.log('[autotest] restarting due to changes...');
+					log('restarting due to changes...');
 					files.forEach(function (file) {
-						sys.log('[autotest] ' + file);
+						log((file + '').underline);
 					});
 					sys.print('\n\n');
 
@@ -156,7 +163,7 @@ controlArg(nodeArgs, 'delay', function (arg, i) {
 	var delay = nodeArgs[i + 1];
 	nodeArgs.splice(i, 2); // remove the delay from the arguments
 	if (delay) {
-		sys.log('[autotest] Adding delay of ' + delay + ' seconds');
+		log('Adding delay of ' + colors.bold(delay) + ' seconds');
 		restartDelay = delay * 1000; // in seconds
 	}
 });
@@ -169,7 +176,7 @@ controlArg(nodeArgs, '--debug', function (arg, i) {
 
 controlArg(nodeArgs, 'npm', function (arg, i) {
 	runNpmTest = true;
-	sys.print('[autotest] Running tests using "npm test"');
+	log('Running tests using ' + colors.bold("npm test"));
 });
 
 if (!nodeArgs.length || !path.existsSync(app)) {
@@ -192,7 +199,7 @@ if (!nodeArgs.length || !path.existsSync(app)) {
 	}
 }
 
-sys.log('[autotest] v' + meta.version);
+log('v' + meta.version);
 
 if(app.indexOf('node') == 0) {
     app = app.slice(4).trim();
@@ -201,7 +208,7 @@ if(app.indexOf('node') == 0) {
 // Change to application dir
 process.chdir(path.dirname(app));
 app = path.basename(app);
-sys.log('[autotest] running ' + app + ' in ' + process.cwd());
+log('running ' + app + ' in ' + process.cwd());
 
 startTests();
 
@@ -219,7 +226,7 @@ fs.chmodSync(flag, '666');
 // remove the flag file on exit
 process.on('exit', function (code) {
 	cleanup();
-	sys.log('[autotest] exiting');
+	log('exiting'.red);
 });
 
 var invokeTimeout = null;
@@ -229,13 +236,13 @@ process.on('SIGINT', function () {
 		cleanup();
 		process.exit(0);
 	}
-	sys.log('Press CTRL+C again to exit...')
+	log('Press CTRL+C again to exit...'.red.bold)
 	invokeTimeout = setTimeout(startTests, 2000);
 });
 
 // on exception *inside* autotest, shutdown wrapped node app
 process.on('uncaughtException', function (err) {
-	sys.log('[autotest] exception in autotest killing node');
+	log('exception in autotest killing node'.red.bold);
 	sys.error(err.stack);
 	cleanup();
 });
