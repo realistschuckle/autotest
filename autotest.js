@@ -30,6 +30,7 @@ var fs = require('fs'),
 	reEscapeChars = /[.|\-[\]()\\]/g,
 	reAsterisk = /\*/g,
 	runNpmTest = false,
+	ignoreFiles = [],
 	runners = {
 		'.coffee': 'coffee',
 		'.py': 'python',
@@ -86,7 +87,14 @@ function getRunnerAndArgs() {
 
 function startMonitor() {
 	var ext = path.extname(app);
-	var cmd = 'find ' + pwd + ' -name \"*' + ext + '\" -type f -newer ' + flag + ' -print';
+	var ignore = [];
+	for(var i = 0; i < ignoreFiles.length; i++) {
+		ignore.push(' -iname "' + ignoreFiles[i] + '"'); // TODO: better command line params
+	}
+	var cmd = 'find ' + pwd + ' -name \"*' + ext + '\" -type f -newer ' + flag 
+		+ (ignore.length > 0 ? ' -not \\( ' + ignore.join(' -or ') + ' \\)' : '')
+		+ ' -print';
+	//log(cmd);
 
 	exec(cmd, function (error, stdout, stderr) {
 		var files = stdout.split(/\n/);
@@ -147,6 +155,7 @@ function cleanup() {
 	fs.unlink(flag);
 }
 
+
 // control arguments test for "help" or "--help" or "-h", run the callback and exit
 controlArg(nodeArgs, 'help', function () {
 	usage();
@@ -174,9 +183,17 @@ controlArg(nodeArgs, '--debug', function (arg, i) {
 	nodeArgs.unshift('--debug'); // put it at the front
 });
 
-controlArg(nodeArgs, 'npm', function (arg, i) {
+controlArg(nodeArgs, '--npm', function (arg, i) {
+	nodeArgs.splice(i,1);
 	runNpmTest = true;
 	log('Running tests using ' + colors.bold("npm test"));
+});
+
+controlArg(nodeArgs, '--ignore', function (arg, i) {
+	nodeArgs.splice(i, 1); // removing the --ignore
+	var filePattern = nodeArgs.splice(i, 1).toString();
+	ignoreFiles = filePattern.split('|');
+	log('Ignoring files matching: ' + ignoreFiles.join(', '));
 });
 
 if (!nodeArgs.length || !path.existsSync(app)) {
