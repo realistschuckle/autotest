@@ -16,8 +16,25 @@ The entry point of your test suite can be specified in the `package.json` file:
 }
 ```
 
-`autotest --npm` will behave as if you ran `npm test` in the directory where you have your `package.json`. This enables you to use a test framework such as [expresso](http://visionmedia.github.com/expresso/), which provides automatic test discovery.
+`autotest --npm` will behave as if you ran `npm test` in the directory where you have your `package.json`. 
+This enables you to use a test framework such as [expresso](http://visionmedia.github.com/expresso/), 
+which provides automatic test discovery.
 
+Use the `--ignore` argument to have `autotest` ignore changes to specific files. 
+For example, you could issue `autotest --ignore "*.log|*.out"` to ignore any 
+log files that are created or updated during your tests and prevent `autotest`
+from restarting the suite when files matching these specs are updated.
+
+Be aware that to ignore all log files you'll have to enclose the pattern in quotes, otherwise the shell's 
+substitution will take precedence. For example, if there is a `npm-debug.log` file in the folder:
+
+```
+# autotest --npm --ignore *.log 
+--> actually runs
+# autotest --npm --ignore npm-debug.log 
+--> if you want to ignore all log files, run
+# autotest --npm --ignore "*.log"
+```
 
 # Installation
 
