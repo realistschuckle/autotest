@@ -6,11 +6,11 @@
       "url": "http://github.com/realistschuckle"
     },
     "bin": { "autotest" : "./autotest.js" },
-    "dependencies" : { "colors" : ">= 0.5.2" },
+    "dependencies" : { "colors" : ">= 0.5.0" },
     "repository": { "type" : "git", "url" : "http://github.com/realistschuckle/autotest.git" },
     "description": "Simple script to provide some autotest capabilities for node or python.",
     "keywords": ["monitor", "development", "restart", "autotest", "reload"],
-    "version": "0.2.4",
+    "version": "0.2.6",
     "preferGlobal" : "true",
     "main": "./autotest"
 }
