@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var fs = require('fs'),
-	sys = require('sys'),
+	util = require('util'),
 	childProcess = require('child_process'),
 	path = require('path'),
 	colors = require('colors'),
@@ -9,11 +9,11 @@ var fs = require('fs'),
 	meta = JSON.parse(fs.readFileSync(__dirname + '/package.json')),
 	exec = childProcess.exec,
 	flag = './.monitor',
-	nodeArgs = process.ARGV.splice(2),
+	nodeArgs = process.argv.splice(2),
 	// removes 'node' and this script
 	app = nodeArgs[0],
 	// process.cwd sometimes changes to the location of autotest.js or .../bin/autotest
-	pwd = process.env['PWD'], 
+	pwd = process.env['PWD'],
 	node = null,
 	monitor = null,
 	timeout = 1000,
@@ -39,7 +39,7 @@ var fs = require('fs'),
 
 function log(what, prefix) {
 	var pfx = typeof (prefix) === 'undefined' || prefix === null ? '' : prefix;
-	sys.log(pfx + '[autotest] '.green + what);
+	util.log(pfx + '[autotest] '.green + what);
 }
 
 function startTests() {
@@ -48,7 +48,7 @@ function startTests() {
 	log('running tests'.green.bold, prefix);
 
 	run = getRunnerAndArgs();
-	// sys.debug('[autotest] running ' + run.runner + ' with args: ' + run.args.join(' ') + ' in ' + pwd);
+	// util.debug('[autotest] running ' + run.runner + ' with args: ' + run.args.join(' ') + ' in ' + pwd);
 	// in case of npm link or even starting with ./node_modules/.bin/autotest
 	// cwd gets confused and the process would think /usr/local/... or .../.bin/ is
 	// the current directory.
@@ -58,11 +58,11 @@ function startTests() {
 	node = spawn(run.runner, run.args);
 
 	node.stdout.on('data', function (data) {
-		sys.print(data);
+		util.print(data);
 	});
 
 	node.stderr.on('data', function (data) {
-		sys.error(data);
+		util.error(data);
 	});
 
 	node.on('exit', function (code, signal) {
@@ -76,7 +76,7 @@ function getRunnerAndArgs() {
 	if (runNpmTest) {
 		return { 'runner' : 'npm', 'args' : 'test --loglevel silent'.split(' ') };
 	}
-	
+
 	var args = nodeArgs.slice(0);
 	args[0] = app;
 	var ext = path.extname(app);
@@ -91,7 +91,7 @@ function startMonitor() {
 	for(var i = 0; i < ignoreFiles.length; i++) {
 		ignore.push(' -iname "' + ignoreFiles[i] + '"'); // TODO: better command line params
 	}
-	var cmd = 'find ' + pwd + ' -name \"*' + ext + '\" -type f -newer ' + flag 
+	var cmd = 'find ' + pwd + ' -name \"*' + ext + '\" -type f -newer ' + flag
 		+ (ignore.length > 0 ? ' -not \\( ' + ignore.join(' -or ') + ' \\)' : '')
 		+ ' -print';
 	//log(cmd);
@@ -111,7 +111,7 @@ function startMonitor() {
 					files.forEach(function (file) {
 						log((file + '').underline);
 					});
-					sys.print('\n\n');
+					util.print('\n\n');
 
 					if (node !== null) {
 						node.kill('SIGUSR2');
@@ -127,7 +127,7 @@ function startMonitor() {
 }
 
 function usage() {
-	sys.print('usage: autotest [--debug] [your node app]\ne.g.: autotest ./server.js\nFor details see http://github.com/realistschuckle/autotest/\n\n');
+	util.print('usage: autotest [--debug] [your node app]\ne.g.: autotest ./server.js\nFor details see http://github.com/realistschuckle/autotest/\n\n');
 }
 
 function controlArg(nodeArgs, label, fn) {
@@ -163,7 +163,7 @@ controlArg(nodeArgs, 'help', function () {
 });
 
 controlArg(nodeArgs, 'version', function () {
-	sys.print('v' + meta.version + '\n');
+	util.print('v' + meta.version + '\n');
 	process.exit();
 });
 
@@ -199,7 +199,7 @@ controlArg(nodeArgs, '--ignore', function (arg, i) {
 if (!nodeArgs.length || !path.existsSync(app)) {
 	// try to get the app from the package.json
 	// doing a try/catch because we can't use the path.exist callback pattern
-	// or we could, but the code would get messy, so this will do exactly 
+	// or we could, but the code would get messy, so this will do exactly
 	// what we're after - if the file doesn't exist, it'll throw.
 	try {
 		app = JSON.parse(fs.readFileSync('./package.json').toString()).scripts.test;
@@ -233,7 +233,7 @@ setTimeout(startMonitor, timeout);
 
 // this little bit of hoop jumping is because sometimes the file can't be
 // touched properly, and it send autotest in to a loop of restarting.
-// this way, the .monitor file is removed entirely, and recreated with 
+// this way, the .monitor file is removed entirely, and recreated with
 // permissions that anyone can remove it later (i.e. if you run as root
 // by accident and then try again later).
 if (path.existsSync(flag)) fs.unlinkSync(flag);
@@ -260,6 +260,6 @@ process.on('SIGINT', function () {
 // on exception *inside* autotest, shutdown wrapped node app
 process.on('uncaughtException', function (err) {
 	log('exception in autotest killing node'.red.bold);
-	sys.error(err.stack);
+	util.error(err.stack);
 	cleanup();
 });
