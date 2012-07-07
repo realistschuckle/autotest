@@ -196,7 +196,7 @@ controlArg(nodeArgs, '--ignore', function (arg, i) {
 	log('Ignoring files matching: ' + ignoreFiles.join(', '));
 });
 
-if (!nodeArgs.length || !path.existsSync(app)) {
+if (!nodeArgs.length || !fs.existsSync(app)) {
 	// try to get the app from the package.json
 	// doing a try/catch because we can't use the path.exist callback pattern
 	// or we could, but the code would get messy, so this will do exactly
@@ -236,7 +236,7 @@ setTimeout(startMonitor, timeout);
 // this way, the .monitor file is removed entirely, and recreated with
 // permissions that anyone can remove it later (i.e. if you run as root
 // by accident and then try again later).
-if (path.existsSync(flag)) fs.unlinkSync(flag);
+if (fs.existsSync(flag)) fs.unlinkSync(flag);
 fs.writeFileSync(flag, '');
 fs.chmodSync(flag, '666');
 
