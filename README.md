@@ -1,3 +1,4 @@
+[![build status](https://secure.travis-ci.org/realistschuckle/autotest.png)](http://travis-ci.org/realistschuckle/autotest)
 # autotest
 
 For use during development of a node.js or python based application. 
